@@ -1,0 +1,97 @@
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.impute import SimpleImputer
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+import matplotlib.pyplot as plt
+import seaborn as sns  # For visualizations
+
+# Step 1: Load the dataset
+# Assuming you've downloaded the dataset and saved it as 'Titanic-Dataset.csv'
+df = pd.read_csv('Titanic-Dataset.csv')  # Adjust the file name if needed
+
+# Step 2: Explore the dataset
+print(df.head())  # View the first few rows
+print(df.info())  # Check for missing values and data types
+print(df.describe())  # Summary statistics
+
+# Visualize the distribution of the target variable
+sns.countplot(x='Survived', data=df)
+plt.title('Survival Distribution')
+plt.show()
+
+# Check for missing values
+print(df.isnull().sum())
+
+# Step 3: Data Preprocessing
+# Drop irrelevant columns
+df = df.drop(['PassengerId', 'Name', 'Ticket', 'Cabin'], axis=1)  # These are not useful for prediction
+
+# Handle missing values
+# For numerical columns like Age and Fare, use median imputation
+imputer = SimpleImputer(strategy='median')
+df[['Age', 'Fare']] = imputer.fit_transform(df[['Age', 'Fare']])
+
+# For categorical columns like Embarked, use mode (most frequent) imputation
+df['Embarked'] = df['Embarked'].fillna(df['Embarked'].mode()[0])
+
+# Encode categorical variables
+label_encoder = LabelEncoder()
+df['Sex'] = label_encoder.fit_transform(df['Sex'])  # Male: 1, Female: 0
+df['Embarked'] = label_encoder.fit_transform(df['Embarked'])  # Converts to numerical values
+
+# Step 4: Feature Selection and Splitting the Data
+X = df.drop('Survived', axis=1)  # Features
+y = df['Survived']  # Target variable
+
+# Split the data into training (80%) and testing (20%) sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Scale the features (optional but helpful for some models)
+scaler = StandardScaler()
+X_train = scaler.fit_transform(X_train)
+X_test = scaler.transform(X_test)
+
+# Step 5: Build and Train the Model
+# Using Logistic Regression as a simple starting model
+model = LogisticRegression(max_iter=200)  # max_iter increases if convergence warnings occur
+model.fit(X_train, y_train)
+
+# Step 6: Make Predictions and Evaluate
+y_pred = model.predict(X_test)
+
+# Accuracy
+accuracy = accuracy_score(y_test, y_pred)
+print(f'Accuracy: {accuracy:.2f}')
+
+# Confusion Matrix
+conf_matrix = confusion_matrix(y_test, y_pred)
+sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues')
+plt.title('Confusion Matrix')
+plt.xlabel('Predicted')
+plt.ylabel('Actual')
+plt.show()
+
+# Classification Report
+print(classification_report(y_test, y_pred))
+
+# Step 7: Make Predictions on New Data (Example)
+# Suppose you have a new passenger's data as a DataFrame
+new_passenger = pd.DataFrame({
+    'Pclass': [3],
+    'Sex': [label_encoder.transform(['male'])[0]],  # Encode as per your earlier encoding
+    'Age': [25],
+    'SibSp': [1],
+    'Parch': [0],
+    'Fare': [7.25],
+    'Embarked': [label_encoder.transform(['S'])[0]]  # Encode as per your earlier encoding
+})
+
+# Scale and predict
+new_passenger_scaled = scaler.transform(new_passenger)
+prediction = model.predict(new_passenger_scaled)
+print(f'Predicted Survival: {"Survived" if prediction[0] == 1 else "Did not survive"}')
+
+
