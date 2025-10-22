@@ -1,0 +1,73 @@
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from collections import Counter
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report, confusion_matrix
+from imblearn.over_sampling import SMOTE
+
+print(" Loading dataset...\n")
+df = pd.read_csv("creditcard.csv")
+
+print(f" Loaded {df.shape[0]} rows, {df.shape[1]} columns\n")
+
+# ---- Preprocessing ----
+scaler = StandardScaler()
+df["scaled_amount"] = scaler.fit_transform(df[["Amount"]])
+df["scaled_time"] = scaler.fit_transform(df[["Time"]])
+df = df.drop(["Amount", "Time"], axis=1)
+
+X = df.drop("Class", axis=1)
+y = df["Class"]
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+print("Class distribution before balancing:", Counter(y_train), "\n")
+
+# ---- SMOTE on a smaller subset ----
+print(" Applying SMOTE on a sample (for speed)...")
+X_train_small = X_train.sample(n=10000, random_state=42)
+y_train_small = y_train.loc[X_train_small.index]
+
+smote = SMOTE(random_state=42)
+X_train_smote, y_train_smote = smote.fit_resample(X_train_small, y_train_small)
+print(" After SMOTE:", Counter(y_train_smote), "\n")
+
+# ---- Train models ----
+print(" Training Logistic Regression...")
+log_reg = LogisticRegression(max_iter=500, random_state=42)
+log_reg.fit(X_train_smote, y_train_smote)
+print(" Logistic Regression done.\n")
+
+print(" Training Random Forest (30 trees)...")
+rf = RandomForestClassifier(n_estimators=30, random_state=42, n_jobs=-1)
+rf.fit(X_train_smote, y_train_smote)
+print(" Random Forest done.\n")
+
+# ---- Evaluation & Plot Saving ----
+def evaluate_and_save(model, X_test, y_test, name):
+    y_pred = model.predict(X_test)
+    cm = confusion_matrix(y_test, y_pred)
+    print(f"\n {name} Evaluation")
+    print(classification_report(y_test, y_pred))
+    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues")
+    plt.title(f"{name} Confusion Matrix")
+    plt.xlabel("Predicted")
+    plt.ylabel("Actual")
+    file = f"confusion_matrix_{name.replace(' ', '_').lower()}.png"
+    plt.tight_layout()
+    plt.savefig(file)
+    plt.close()
+    print(f" Saved plot as: {file}\n")
+
+evaluate_and_save(log_reg, X_test, y_test, "Logistic Regression")
+evaluate_and_save(rf, X_test, y_test, "Random Forest")
+
+print("All done! Plots saved in project folder.\n")
